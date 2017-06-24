@@ -1,0 +1,44 @@
+- hosts: ose3-common
+  tasks:
+    - name: change docker config
+      lineinfile:
+        dest: /etc/sysconfig/docker
+        regexp: "^OPTIONS="
+        line: "OPTIONS=' --selinux-enabled  --log-driver=json-file' "
+      notify:
+        - restart docker
+        - delete fluentd pods (so they are relaunched)
+
+  handlers:
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted
+    - name: delete fluentd pods (so they are relaunched)
+      shell: oc delete pods -l logging-infra=fluentd -n logging
+      delegate_to: "{{ groups['bastion'][0] }}"
+
+- hosts: ose3-master
+  tasks:
+    - name: add developer htpasswd
+      htpasswd:
+        path: /etc/origin/master/htpasswd
+        name: "{{ item }}"
+        password: "{{ demo_password }}"
+      with_items:
+        - developer
+        - admin
+        - consumer
+    #TODO - name: configure AD integration
+
+- hosts: bastion
+  tasks:
+    # see: https://github.com/Microsoft/openshift-container-platform/issues/4
+    - name: add labels to all nodes for fluentd deployment
+      shell: oc label nodes --all logging-infra-fluentd=true
+    #TODO - name: reintroduce proper zone labels
+    # see: https://github.com/Microsoft/openshift-container-platform/issues/3
+    #TODO - name: mark master nodes as unschedulable
+    #   shell:
+    #   with_items: "{{ ose3-master }}"
+    #TODO - evacuate master nodes

@@ -1,0 +1,27 @@
+[all:vars]
+ssh_key_file="~/Downloads/ocp_id_rsa"
+ansible_user="ocpadmin"
+ansible_become=true
+ansible_become_user=root
+ansible_become_method=sudo
+demo_password='dummy'
+
+[bastion]
+mydemocluster-bastion ansible_host=23.32.1.5
+
+[ose3-master]
+mydemocluster-master-0
+
+[ose3-node]
+mydemocluster-node-0
+mydemocluster-node-1
+
+[ose3-common:children]
+ose3-master
+ose3-node
+
+[bastion:vars]
+ansible_ssh_common_args="-i {{ ssh_key_file }} -o StrictHostKeyChecking=no"
+
+[ose3-common:vars]
+ansible_ssh_common_args="-i {{ ssh_key_file }} -o ProxyCommand='ssh -i {{ ssh_key_file }} -W %h:%p -q {{ hostvars[groups['bastion'][0]].ansible_user }}@{{ hostvars[groups['bastion'][0]].ansible_host }}' -o StrictHostKeyChecking=no"
